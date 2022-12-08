@@ -1,0 +1,1166 @@
+---
+title: "California Lead Levels and Children's Environmental Health"
+name: Emily Bonacchi
+date: "10-18-22"
+---
+# Import library
+```{r}
+library(tidyverse)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Import lead levels in CA schools dataset from https://data.cnra.ca.gov/dataset/drinking-water-results-of-lead-sampling-of-drinking-water-in-california-schools
+```{r}
+library(readr)
+school_lead_levels <- read_csv("school_lead_levels.csv")
+View(school_lead_levels)
+```
+## remove NA from lead levels in school dataset
+```{r}
+school_lead_levels <-  na.omit(school_lead_levels)
+```
+
+## Filter out schools that have excess lead levels (higher than 15 UG/L) and make a new data set
+```{r}
+greater_than_15 <- school_lead_levels %>% filter(result > 15)
+```
+### dotplot of schools that have excess lead levels
+```{r}
+ggplot(greater_than_15) + geom_point(mapping = aes(x = school_county, y = result, color = school_county, width = 0.8)) + coord_flip() + ylab("lead_level_ug/L")
+```
+#### frequency of school counties appearing in dataset with excess lead levels
+```{r}
+ggplot(greater_than_15) + geom_bar(mapping = aes(x = school_county)) + coord_flip() + ylab("Number of Sites in County that Exceeded 15 ug/L")
+```
+## Filter dataset with lead levels that exceed standard to only contain elementary schools
+```{r}
+elementary_schools <- greater_than_15 %>% filter(str_detect(school_name, '\\b(Elementary)\\b'))
+```
+### dotplot representing only elementary schools 
+```{r}
+ggplot(elementary_schools) + geom_point(mapping = aes(x = school_county, y = result, color = school_county, width = 0.8)) + coord_flip() + ylab("Lead_level(ug/L)")
+```
+#### Graph showing corrective measures taken or what did the government do about these high levels?
+```{r}
+ggplot(elementary_schools) + geom_point(mapping = aes(x = result, y = ale_follow_up_action)) + ylab("Follow up Action") + xlab("Lead Result ug/L") 
+```
+
+#Blood lead levels in children 6 years and over with readings of greater than 4.5 mcg/dL 
+##import dataset from https://www.cdph.ca.gov/Programs/CCDPHP/DEODC/CLPPB/Pages/BLLMapsTables2020.aspx and create a graph showing how many individuals in each county have BLL over 4.5
+```{r}
+library(readxl)
+bll4_5 <- read_excel("bll4.5.xlsx")
+View(bll4_5)
+ggplot(bll4_5) + geom_col(mapping = aes(x = greater_than4.5, y = Health_Jurisdiction))
+```
+# Blood lead levels in children 6 years and over with readings of greater than 9 mcg/dL 
+## import data set from https://www.cdph.ca.gov/Programs/CCDPHP/DEODC/CLPPB/Pages/BLLMapsTables2020.aspx and create a graph showing how many individuals in each county have BLL over 9
+```{r}
+library(readxl)
+BLL_9 <- read_excel("BLL_9.xlsx")
+View(BLL_9)
+ggplot(BLL_9) + geom_col(mapping = aes(x = greater_than9.5, y = Health_Jurisdiction))
+```
+# Determining which counties overlap with lead in water and lead in blood - this is to help determine which CA counties need to be focused on for census data (to determine lead risk factors)
+```{r}
+elementary_schools %>% rename(Health_Jurisdiction = school_county)
+counties <- inner_join(BLL_9, bll4_5, elementary_schools, by = "Health_Jurisdiction")
+counties$Health_Jurisdiction
+```
+## import CA counties dataset from https://data.ca.gov/dataset/california-counties/resource/8302d20a-3bab-4687-9a32-b2c84b6ee603 
+```{r}
+library(readr)
+California_Counties <- read_csv("California_Counties.csv")
+View(California_Counties)
+```
+## Mapping overlapping counties across BLL and schools DF and CA_counties DF
+```{r}
+x <- California_Counties$Name
+y <- counties$Health_Jurisdiction
+match(y,x)
+```
+#### Overlapping counties include: sacramento, alameda, merced, butte, contra costa, humboldt,solano, yolo, santa cruz, fresno, madera, san joaquin, tulare, santa clara, san fran, san mateo, sonoma, stanislaus, orange, san diego, los angelos, monterey, san luis obispo, santa barbara, imperial, placer, kern, kings, san bernardino, riverside, ventura, marin, el dorado, napa, shasta
+# CA Counties and mapping
+## filtering counties to only counties with evidence of lead in population of children
+```{r}
+CA_counties_final <- California_Counties[-c(1,2, 3, 5, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 22, 26, 27, 29, 30, 36, 43, 45),]
+```
+## Map of CA 
+### Install packages
+```{r}
+library(ggplot2)
+library(maps)
+library(ggmap)
+```
+#### Google API for map
+```{r}
+register_google(key = "AIzaSyAFj9wnW3354ZdqUCJyM8pn8AQWg7MJc3Y")
+```
+##### map of CA and counties with lead exposures
+```{r}
+cali_counties <- get_map(location = 'California', source = "stamen", maptype = "terrain", zoom = 6) 
+ggmap(cali_counties) + geom_point(data = CA_counties_final, mapping = aes(x = Longitude, y = Latitude))
+```
+# case studies of counties with high lead levels and risk factors
+# Humbolt, CA
+## importing humbolt data from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&t=Families%20and%20Living%20Arrangements&g=0500000US06023&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+ humbolt_county_demo <- read_csv("humbolt_county_demo.csv")
+```
+### filtering to only include race
+```{r}
+humbolt_county_demo <- humbolt_county_demo[-c(1:38, 42:45,47:53, 55:74, 76:94),]
+```
+#### graphing demographics
+```{r}
+ggplot(humbolt_county_demo) + geom_col(mapping = aes(x = Label, y = Humboldt_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty levels in Humboldt
+### download poverty data set from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06023&tid=ACSST5Y2020.S0901&moe=true
+```{r}
+poverty_Humboldt <- read_csv("poverty_Humboldt.csv")
+```
+
+### filter data set 
+```{r}
+poverty_Humboldt <- poverty_Humboldt[-c(1:40,42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ ggplot(poverty_Humboldt) + geom_col(mapping = aes(x = Label, y = Humboldt_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Alameda, CA
+## download demographics data set from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06001&tid=ACSDP5Y2020.DP05
+```{r}
+alameda_demo <- read_csv("alameda_demo.csv")
+```
+### filter to just demographics
+```{r}
+alameda_demo <- alameda_demo[-c(1:38,42:45,47:53,55:74,76:94),]
+```
+#### graph demos
+```{r}
+ggplot(alameda_demo) + geom_col(mapping = aes(x = Label, y = Alameda_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## import poverty data from:https://data.census.gov/cedsci/table?q=demographics%20California%202020&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+alameda_pov <- read_csv("alameda_pov.csv")
+View(alameda_pov)
+```
+### filter data
+```{r}
+alameda_pov <- alameda_pov[-c(1:40, 42:43, 46:49),]
+```
+#### plot poverty
+```{r}
+ ggplot(alameda_pov) + geom_col(mapping = aes(x = Label, y = Alameda_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Butte, CA
+## dowloading data from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06007&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+butte_demo <- read_csv("butte_demo.csv")
+View(butte_demo)
+```
+### filter data
+```{r}
+butte_demo <- butte_demo[-c(1:38, 42:45, 47:53, 55:74, 76:94),]
+```
+#### demographics graph
+```{r}
+ggplot(butte_demo) + geom_col(mapping = aes(x = Label, y = Butte_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## download poverty data from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06007&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+butte_pov <- read_csv("butte-pov.csv")
+View(butte_pov)
+```
+### filter data
+```{r}
+butte_pov <- butte_pov[-c(1:40, 42:43, 46:49),]
+```
+#### poverty plot
+```{r}
+ggplot(butte_pov) + geom_col(mapping = aes(x = Label, y = Butte_County)) + scale_x_discrete(labels = label_wrap_gen(10)) 
+```
+# Contra Costa, CA
+## download data from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06013&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+contra_costa_demo <- read_csv("contra_costa_demo.csv")
+View(contra_costa_demo)
+```
+### filter data
+```{r}
+contra_costa_demo <- contra_costa_demo[-c(1:38, 42:45, 47:53, 55:74, 76:94),]
+```
+#### graphing demographics
+```{r}
+ggplot(contra_costa_demo) + geom_col(mapping = aes(x = Label, y = Contra_Costa, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## import poverty  data from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+c_c_pov <- read_csv("c_c_pov.csv")
+View(c_c_pov)
+```
+### filter
+```{r}
+c_c_pov <- c_c_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(c_c_pov) + geom_col(mapping = aes(x = Label, y = Contra_Costa)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# El Dorado, CA
+##import data from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06017&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+el_dor_demo <- read_csv("el_dor_demo.csv")
+View(el_dor_demo)
+```
+### Filtering data set
+```{r}
+ el_dor_demo <- el_dor_demo[-c(1:38, 42:45, 47:53, 55:74, 76: 94),]
+```
+#### graph demographics
+```{r}
+ggplot(el_dor_demo) + geom_col(mapping = aes(x = Label, y = El_Dorado, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## el dorado poverty data from:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06017&tid=ACSST5Y2020.S0901 
+```{r}
+library(readr)
+el_dor_pov <- read_csv("el_dor_pov.csv")
+View(el_dor_pov)
+```
+### filter
+```{r}
+el_dor_pov <- el_dor_pov[-c(1:40,42:43, 46:49),]
+```
+#### pov graph
+```{r}
+ggplot(el_dor_pov) + geom_col(mapping = aes( x = Label, y = El_Dorado)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Fresno, CA
+## import data: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06019&tid=ACSDP5Y2020.DP05
+
+```{r}
+library(readr)
+fresno_demo <- read_csv("fresno_demo.csv")
+View(fresno_demo)
+```
+
+### filter
+```{r}
+fresno_demo <- fresno_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graphing demographics 
+```{r}
+ggplot(fresno_demo) + geom_col(mapping = aes(x = Label, y = Fresno_county, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty import data set: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06019&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+fresno_pov <- read_csv("fresno_pov.csv")
+View(fresno_pov)
+```
+### filter
+```{r}
+fresno_pov <- fresno_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty 
+```{r}
+ggplot(fresno_pov) + geom_col(mapping = aes(x = Label, y = Fresno_county)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Imperial, CA
+## import:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06025&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+imperial_demo <- read_csv("imperial_demo.csv")
+View(imperial_demo)
+```
+### filter
+```{r}
+imperial_demo <- imperial_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(imperial_demo) + geom_col(mapping = aes(x = Label, y = Imperial_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## import poverty data: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06025&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+imperial_pov <- read_csv("imperial_pov.csv")
+View(imperial_pov)
+```
+### filter
+```{r}
+imperial_pov <- imperial_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(imperial_pov) + geom_col(mapping = aes(x = Label, y = Imperial_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Kern, CA
+## import demographics df: 
+```{r}
+library(readr)
+ Kern_demo <- read_csv("Kern_demo.csv")
+```
+### filter
+```{r}
+Kern_demo <-Kern_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(Kern_demo) + geom_col(mapping = aes(x = Label, y = Kern_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty data import from https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06025&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+Kern_pov <- read_csv("Kern_pov.csv")
+View(Kern_pov)
+```
+### filter
+```{r}
+Kern_pov <- Kern_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(Kern_pov) + geom_col(mapping = aes(x = Label, y = Kern_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Kings, CA
+## import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06031&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+Kings_demo <- read_csv("Kings_demo.csv")
+View(Kings_demo)
+```
+### filter
+```{r}
+Kings_demo <- Kings_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+## graph demographics
+```{r}
+ggplot(Kings_demo) + geom_col(mapping = aes(x = Label, y = Kings_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06031&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+kings_pov <- read_csv("kings_pov.csv")
+View(kings_pov)
+```
+### filter
+```{r}
+kings_pov <- kings_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(kings_pov) + geom_col(mapping = aes(x = Label, y = Kings_County)) + scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Los Angelos, CA
+##import demographics from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06037&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+LA_demo <- read_csv("LA_demo.csv")
+View(LA_demo)
+```
+### filter
+```{r}
+LA_demo <- LA_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### plot demographics
+```{r}
+ggplot(LA_demo) + geom_col(mapping = aes(x = Label, y = Los_Angeles, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty data import from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06037&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+LA_pov <- read_csv("LA_pov.csv")
+View(LA_pov)
+```
+### filter
+```{r}
+LA_pov <- LA_pov[-c(1:40, 42:43, 46:49),]
+
+```
+#### graph poverty
+```{r}
+ggplot(LA_pov) + geom_col(mapping = aes(x = Label, y = Los_Angeles)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Madera, CA
+## import demograhics data from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06039&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+madera_demo <- read_csv("madera_demo.csv")
+View(madera_demo)
+```
+### filter
+```{r}
+madera_demo <- madera_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+## graph demographics
+```{r}
+ggplot(madera_demo) + geom_col(mapping = aes(x = Label, y = Madera_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## import poverty data: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06039&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+madera_pov <- read_csv("madera_pov.csv")
+View(madera_pov)
+```
+### filter
+```{r}
+madera_pov <- madera_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(madera_pov) + geom_col(mapping = aes(x = Label, y = Madera_County)) +  scale_x_discrete(labels = label_wrap_gen(10)) 
+```
+# Marin, CA
+##import data https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06041&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+marin_demo <- read_csv("marin-demo.csv")
+View(marin_demo)
+```
+###filter
+```{r}
+marin_demo <- marin_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+## graph demographics
+```{r}
+ggplot(marin_demo) + geom_col(mapping = aes(x = Label, y = Marin_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06041&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+marin_pov <- read_csv("marin_pov.csv")
+View(marin_pov)
+```
+### filter
+```{r}
+marin_pov <- marin_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(marin_pov) + geom_col(mapping = aes(x = Label, y = Marin_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Merced, CA
+##import demographic data: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06047&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+merced_demo <- read_csv("merced_demo.csv")
+View(merced_demo)
+```
+### filter
+```{r}
+merced_demo <- merced_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics 
+```{r}
+ggplot(merced_demo) + geom_col(mapping = aes(x = Label, y = Merced_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty data import:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06047&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+merced_pov <- read_csv("merced_pov.csv")
+View(merced_pov)
+```
+### filter
+```{r}
+merced_pov <- merced_pov[-c(1:40,42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(merced_pov) + geom_col(mapping = aes(x = Label, y = Merced_County))
+```
+# Monteray, CA
+## import from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06053&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+mont_demo <- read_csv("mont_demo.csv")
+View(mont_demo)
+```
+### filter
+```{r}
+mont_demo <- mont_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics 
+```{r}
+ggplot(mont_demo) + geom_col(mapping = aes(x = Label, y = Monterey_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty import from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06053&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+mont_pov <- read_csv("mont_pov.csv")
+View(mont_pov)
+```
+### filter
+```{r}
+mont_pov <- mont_pov[-c(1:40, 42:43, 46:49),]
+
+```
+## graph poverty data
+```{r}
+ggplot(mont_pov) + geom_col(mapping = aes(x = Label, y = Monterey_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Napa, CA
+## import demo from:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06055&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+napa_demo <- read_csv("napa_demo.csv")
+View(napa_demo)
+```
+### filter
+```{r}
+ napa_demo <- napa_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(napa_demo) + geom_col(mapping = aes(x = Label, y = Napa_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## import poverty data: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06055&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+napa_pov <- read_csv("napa_pov.csv")
+View(napa_pov)
+```
+### filter
+```{r}
+napa_pov <- napa_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(napa_pov) + geom_col(mapping = aes(x = Label, y = Napa_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Orange, CA
+## import demographics  from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06059&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+orange_demo <- read_csv("orange_demo.csv")
+View(orange_demo)
+```
+### filter data
+```{r}
+orange_demo <- orange_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(orange_demo) + geom_col(mapping = aes(x = Label, y = Orange_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## import poverty data: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06059&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+orange_pov <- read_csv("orange_pov.csv")
+View(orange_pov)
+```
+### filter
+```{r}
+orange_pov <- orange_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty 
+```{r}
+ggplot(orange_pov) + geom_col(mapping = aes(x = Label, y = Orange_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Placer, CA
+## import demo:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06061&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+placer_demo <- read_csv("placer_demo.csv")
+View(placer_demo)
+```
+### filter
+```{r}
+placer_demo <- placer_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(placer_demo) + geom_col(mapping = aes(x = Label, y = Placer_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06061&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+placer_pov <- read_csv("placer_pov.csv")
+View(placer_pov)
+```
+### filter
+```{r}
+placer_pov <- placer_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(placer_pov) + geom_col(mapping = aes(x = Label, y = Placer_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Riverside, CA
+## import date from:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06065&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+riverside_demo <- read_csv("riverside_demo.csv")
+View(riverside_demo)
+```
+### filter
+```{r}
+riverside_demo <- riverside_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(riverside_demo) + geom_col(mapping = aes(x = Label, y = Riverside_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty data: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06065&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+riverside_pov <- read_csv("riverside_pov.csv")
+View(riverside_pov)
+```
+### filter
+```{r}
+riverside_pov <- riverside_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(riverside_pov) + geom_col(mapping = aes(x = Label, y = Riverside_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Sacramento, CA
+##demo data:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06067&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+sacramento_demo <- read_csv("sacramento_demo.csv")
+View(sacramento_demo)
+```
+### filter
+```{r}
+sacramento_demo <- sacramento_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(sacramento_demo) + geom_col(mapping = aes(x = Label, y = Sacramento_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty info: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06067&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+sacramento_pov <- read_csv("sacramento_pov.csv")
+View(sacramento_pov)
+```
+### filter data
+```{r}
+ sacramento_pov <- sacramento_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(sacramento_pov) + geom_col(mapping = aes(x = Label, y = Sacramento_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# San Bernadino, CA
+##import from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06071&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+san_bernadino_demo <- read_csv("san_bernadino_demo.csv")
+View(san_bernadino_demo)
+```
+### filter
+```{r}
+san_bernadino_demo <- san_bernadino_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics 
+```{r}
+ggplot(san_bernadino_demo) + geom_col(mapping = aes(x = Label, y = San_Bernardino, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty data: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06071&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+san_bernardino_pov <- read_csv("san_bernardino_pov.csv")
+View(san_bernardino_pov)
+```
+### filter
+```{r}
+san_bernardino_pov <- san_bernardino_pov[-c(1:40, 42:43, 46:49),]
+```
+## graph poverty
+```{r}
+ggplot(san_bernardino_pov) + geom_col(mapping = aes(x = Label, y = San_Bernardino)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# San Diego, CA
+## import from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06073&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+san_diego_demo <- read_csv("san_diego_demo.csv")
+View(san_diego_demo)
+```
+### filter
+```{r}
+san_diego_demo <- san_diego_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(san_diego_demo) + geom_col(mapping = aes(x = Label, y = San_Diego, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty import: 
+```{r}
+library(readr)
+san_diego_pov <- read_csv("san_diego_pov.csv")
+View(san_diego_pov)
+```
+### filter
+```{r}
+san_diego_pov <- san_diego_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty 
+```{r}
+ggplot(san_diego_pov) + geom_col(mapping = aes(x = Label, y = San_Diego )) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# San Francisco, CA
+## import from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06075&tid=ACSDP5Y2020.DP05
+`
+```{r}
+library(readr)
+san_fran_demo <- read_csv("san_fran_demo.csv")
+View(san_fran_demo)
+```
+### filter
+```{r}
+san_fran_demo <- san_fran_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(san_fran_demo) + geom_col(mapping = aes(x = Label, y = San_Fran, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty import from:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06075&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+san_fran_pov <- read_csv("san_fran_pov.csv")
+View(san_fran_pov)
+```
+### filter
+```{r}
+san_fran_pov <- san_fran_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(san_fran_pov) + geom_col(mapping = aes(x = Label, y = San_Fran)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# San Jouaquin, CA
+## import demo: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06077&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+san_joaquin_demo <- read_csv("san_joaquin_demo.csv")
+View(san_joaquin_demo)
+```
+### filter
+```{r}
+san_joaquin_demo <- san_joaquin_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(san_joaquin_demo) + geom_col(mapping = aes(x = Label, y = San_Joaquin, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06077&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+san_joaquin_pov <- read_csv("san_joaquin_pov.csv")
+View(san_joaquin_pov)
+```
+### filter
+```{r}
+san_joaquin_pov <- san_joaquin_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(san_joaquin_pov) + geom_col(mapping = aes(x = Label, y = San_Joaquin)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# San Luis, CA
+## import from:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06079&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+san_luis_demo <- read_csv("san_luis_demo.csv")
+View(san_luis_demo)
+```
+### filter
+```{r}
+san_luis_demo <- san_luis_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph
+```{r}
+ggplot(san_luis_demo) + geom_col(mapping = aes(x = Label, y = San_Luis, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06079&tid=ACSST5Y2020.S0901&moe=false
+```{r}
+library(readr)
+san_luis_pov <- read_csv("san_luis_pov.csv")
+View(san_luis_pov)
+```
+### filter
+```{r}
+san_luis_pov <- san_luis_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty 
+```{r}
+ggplot(san_luis_pov) + geom_col(mapping = aes(x = Label, y = San_Luis)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# San Mateo, CA
+## import data from: https://data.census.gov/table?g=0500000US06081
+```{r}
+ library(readr)
+san_mateo_demo <- read_csv("san_mateo_demo.csv")
+View(san_mateo_demo)
+```
+### filter
+```{r}
+san_mateo_demo <- san_mateo_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph
+```{r}
+ggplot(san_mateo_demo) + geom_col(mapping = aes(x = Label, y = San_Mateo, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty data import: https://data.census.gov/table?g=0500000US06081&tid=ACSST1Y2021.S0901
+```{r}
+library(readr)
+san_mateo_pov <- read_csv("san_mateo_pov.csv")
+View(san_mateo_pov)
+```
+###filter
+```{r}
+san_mateo_pov <- san_mateo_pov[-c(1:40, 42:43, 46:49),]
+```
+##graph
+```{r}
+ggplot(san_mateo_pov) + geom_col(mapping = aes(x = Label, y = San_Mateo)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Santa Barabara, CA
+## import data from: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06083&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+santa_barb_demo <- read_csv("santa_barb_demo.csv")
+View(santa_barb_demo)
+```
+### filter
+```{r}
+santa_barb_demo <- santa_barb_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(santa_barb_demo) + geom_col(mapping = aes(x = Label, y = Santa_Barbara, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06083&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+santa_barb_pov <- read_csv("santa_barb_pov.csv")
+View(santa_barb_pov)
+```
+### filter
+```{r}
+santa_barb_pov <- santa_barb_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(santa_barb_pov) + geom_col(mapping = aes(x = Label, y = Santa_Barbara)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Santa Clara, CA
+## import:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06085&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+santa_clara_demo <- read_csv("santa_clara_demo.csv")
+View(santa_clara_demo)
+```
+### filter
+```{r}
+santa_clara_demo <- santa_clara_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(santa_clara_demo) + geom_col(mapping = aes(x =Label, y = Santa_Clara_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## import:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06085&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+santa_clara_pov <- read_csv("santa_clara_pov.csv")
+View(santa_clara_pov)
+```
+### filter
+```{r}
+santa_clara_pov <- santa_clara_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(santa_clara_pov) + geom_col(mapping = aes(x = Label, y = Santa_Clara)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Santa Cruz, CA
+## import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06087&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+santa_cruz_demo <- read_csv("santa_cruz_demo.csv")
+View(santa_cruz_demo)
+```
+### filter data
+```{r}
+santa_cruz_demo <- santa_cruz_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+## graph demographics
+```{r}
+ggplot(santa_cruz_demo) + geom_col(mapping =aes(x = Label, y = Santa_Cruz, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## import:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06087&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+santa_cruz_pov <- read_csv("santa_cruz_pov.csv")
+View(santa_cruz_pov)
+```
+### filter
+```{r}
+santa_cruz_pov <- santa_cruz_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(santa_cruz_pov) + geom_col(mapping = aes(x = Label, y = Santa_Cruz)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Shasta, CA
+## import:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06089&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+shasta_demo <- read_csv("shasta_demo.csv")
+View(shasta_demo)
+```
+### filter
+```{r}
+shasta_demo <- shasta_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(shasta_demo) + geom_col(mapping = aes(x = Label, y = Shasta_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06089&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+shasta_pov <- read_csv("shasta_pov.csv")
+View(shasta_pov)
+```
+### filter
+```{r}
+shasta_pov <- shasta_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(shasta_pov) + geom_col(mapping = aes(x = Label, y = Shasta_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Solano, CA
+## import data from: https://data.census.gov/table?q=demographics+California+2020&g=0500000US06095&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+solano_demo <- read_csv("solano_demo.csv")
+View(solano_demo)
+```
+### filter
+```{r}
+solano_demo <- solano_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(solano_demo) + geom_col(mapping = aes(x = Label, y = Solano_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06095&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+solano_pov <- read_csv("solano_pov.csv")
+View(solano_pov)
+```
+### filter
+```{r}
+solano_pov <- solano_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(solano_pov) + geom_col(mapping = aes(x = Label, y = Solano_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Sonoma, CA
+##import:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06097&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+sonoma_demo <- read_csv("sonoma_demo.csv")
+View(sonoma_demo)
+```
+### filter
+```{r}
+sonoma_demo <- sonoma_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(sonoma_demo) + geom_col(mapping = aes(x = Label, y = Sonoma_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06097&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+sonoma_pov <- read_csv("sonoma_pov.csv")
+View(sonoma_pov)
+```
+### filter
+```{r}
+sonoma_pov <- sonoma_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(sonoma_pov) + geom_col(mapping = aes(x = Label, y = Sonoma_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Stanislaus, CA
+## import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06099&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+stanislaus_demo <- read_csv("stanislaus_demo.csv")
+View(stanislaus_demo)
+```
+### filter
+```{r}
+stanislaus_demo <- stanislaus_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(stanislaus_demo) + geom_col(mapping = aes(x = Label, y = Stanislaus_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06099&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+stanislaus_pov <- read_csv("stanislaus_pov.csv")
+View(stanislaus_pov)
+```
+### filter
+```{r}
+stanislaus_pov <- stanislaus_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(stanislaus_pov) + geom_col(mapping = aes(x = Label, y = Stanislaus_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Tulare< CA
+##import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06107&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+tulare_demo <- read_csv("tulare_demo.csv")
+View(tulare_demo)
+```
+### filter
+```{r}
+tulare_demo <- tulare_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(tulare_demo) + geom_col(mapping = aes(x = Label, y = Tulare_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06107&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+tulare_pov <- read_csv("tulare_pov.csv")
+View(tulare_pov)
+```
+### filter
+```{r}
+tulare_pov <- tulare_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(tulare_pov) + geom_col(mapping = aes(x = Label, y = Tulare_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Ventura, CA
+## import: https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06111&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+ventura_demo <- read_csv("ventura_demo.csv")
+View(ventura_demo)
+```
+### filter
+```{r}
+ventura_demo <- ventura_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph
+```{r}
+ggplot(ventura_demo) + geom_col(mapping = aes(x = Label, y = Ventura_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## import:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06111&tid=ACSST5Y2020.S0901
+```{r}
+library(readr)
+ventura_pov <- read_csv("ventura_pov.csv")
+View(ventura_pov)
+```
+### filter
+```{r}
+ventura_pov <- ventura_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph poverty
+```{r}
+ggplot(ventura_pov) + geom_col(mapping = aes(x = Label, y = Ventura_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Yolo, CA
+## import:https://data.census.gov/cedsci/table?q=demographics%20California%202020&g=0500000US06113&tid=ACSDP5Y2020.DP05
+```{r}
+library(readr)
+yolo_demo <- read_csv("yolo_demo.csv")
+View(yolo_demo)
+```
+### filter
+```{r}
+yolo_demo <- yolo_demo[-c(1:38,42:45, 47:53, 55:74, 76:94),]
+```
+#### graph demographics
+```{r}
+ggplot(yolo_demo) + geom_col(mapping = aes(x = Label, y = Yolo_County, fill = Label)) + theme(axis.text.x = element_blank())
+```
+## poverty import:
+```{r}
+library(readr)
+yolo_pov <- read_csv("yolo_pov.csv")
+View(yolo_pov)
+```
+### filter
+```{r}
+yolo_pov <- yolo_pov[-c(1:40, 42:43, 46:49),]
+```
+#### graph
+```{r}
+ggplot(yolo_pov) + geom_col(mapping = aes(x = Label, y = Yolo_County)) +  scale_x_discrete(labels = label_wrap_gen(10))
+```
+# Which counties have children who are at poverty level (greater than CA national average of 12.3%), risk factor for lead exposure
+##Humboldt, butte, Fresno, Imperial, Kern, Kings, LA, Madera, Merced, Monterey, Orange, riverside, sacramento, san bernadino, san diego, san jouaquin, santa babara, shasta, Stanislaus, Tulare, Yolo
+### graph showing this created in excel; import data
+```{r}
+library(readr)
+county_poverty <- read_csv("county_poverty.csv")
+View(county_poverty)
+```
+#### graph poverty data for each county
+```{r}
+ggplot(county_poverty) + geom_col(mapping = aes(x = County, y = below_poverty_level)) + scale_x_discrete(labels = label_wrap_gen(10)) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 0.5)) 
+```
+# Next risk factor:homes built before 1978
+## creating a data table in excel from: https://www.census.gov/programs-surveys/ahs/data/interactive/ahstablecreator.html?s_areas=00006&s_year=2021&s_tablename=TABLE5&s_bygroup1=4&s_bygroup2=1&s_filtergroup1=1&s_filtergroup2=1
+### importing data set
+```{r}
+library(readr)
+ca_year_built <- read_csv("ca_year_built.csv")
+View(ca_year_built)
+```
+#### graphing data
+```{r}
+ggplot(ca_year_built) + geom_col(mapping = aes(x = Year_Built, y = Total)) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 0.5)) 
+```
+## HUD data: https://www.census.gov/programs-surveys/ahs/data/interactive/ahstablecreator.html?s_areas=00006&s_year=2021&s_tablename=TABLE5&s_bygroup1=28&s_bygroup2=1&s_filtergroup1=1&s_filtergroup2=1 
+```{r}
+library(readr)
+HUD <- read_csv("HUD.csv")
+View(HUD)
+```
+### HUD graph
+```{r}
+ggplot(HUD) + geom_col(mapping = aes(x = Total, y = HUD_assisted_status))
+```
+## English as a second language 
+### import data from: https://www.indexmundi.com/facts/united-states/quick-facts/california/language-other-than-english-spoken-at-home-percentage#table -remove counties without excess lead levels
+```{r}
+library(readr)
+Ca_counties_language <- read_csv("Ca_counties_language.csv")
+View(Ca_counties_language)
+```
+#### Graph of other language spoken at home other than english
+```{r}
+ggplot(data = Ca_counties_language) + geom_col(mapping=aes(x = County, y = Value)) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 0.5)) 
+```
+
