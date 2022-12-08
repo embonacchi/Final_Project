@@ -94,7 +94,7 @@ library(ggmap)
 ```
 #### Google API for map
 ```{r}
-register_google(key = "AIzaSyAFj9wnW3354ZdqUCJyM8pn8AQWg7MJc3Y")
+register_google(key = )
 ```
 ##### map of CA and counties with lead exposures
 ```{r}
